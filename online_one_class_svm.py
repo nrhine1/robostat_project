@@ -51,7 +51,7 @@ class online_one_class_svm(object):
 def main():
     nu = 0.1
 
-    ca01_feats = numpy.load('ca01_feats.npz')['arr_0'][15:]
+    ca01_feats = numpy.load('feats/ca05_no_label_bov.npz')['arr_0'][15:]
 
     # ca01_feats = numpy.vstack((ca01_feats, ca01_feats))
     oocs = online_one_class_svm(nu, ca01_feats.shape[1])
