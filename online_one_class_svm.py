@@ -27,14 +27,14 @@ class online_one_class_svm(object):
             grad_w -= self.phi(x) * self.nu_inv
             grad_rho += self.nu_inv
         
-        eta = self.nu * 1.0 / self.t # TODO learning rate
+        eta =  self.nu * 1.0 / self.t # TODO learning rate
 
         self.w -= eta * grad_w
         self.rho -= eta * grad_rho
         
         wn = numpy.linalg.norm(self.w)
         if wn > self.sqrt_inv_nu:
-            self.w = self.w / wn * self.sqrt_inv_nu
+            self.w = self.w / wn * self.nu_inv
         # TODO projection
         self.t += 1
 
@@ -53,7 +53,7 @@ def main():
 
     ca01_feats = numpy.load('ca01_feats.npz')['arr_0'][15:]
 
-    ca01_feats = numpy.vstack((ca01_feats, ca01_feats))
+    # ca01_feats = numpy.vstack((ca01_feats, ca01_feats))
     oocs = online_one_class_svm(nu, ca01_feats.shape[1])
 
     y_p = oocs.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)))
