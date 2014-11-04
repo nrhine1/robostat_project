@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import scipy.io
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
@@ -6,8 +7,12 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy
 import numpy as np
 import pdb
+<<<<<<< HEAD
 import gtkutils.pdbwrap as pdbw
 import gtkutils.img_util as iu
+=======
+#import gtkutils.pdbwrap as pdbw
+>>>>>>> 53a6bb46756312ce5eb8ba6c5dea862250eecd51
 
 class online_one_class_svm(object):
     def __init__(self, nu, feature_size, phi=None):
@@ -166,10 +171,10 @@ class one_class_norma(object):
         Y_p = numpy.zeros_like(Y)
         rhos = numpy.zeros_like(Y)
 
-
+        print "."
         for (xi, x) in enumerate(X):
-            if xi % 20:
-                print xi
+            #if xi % 20:
+            #    print xi
 
             y_p = self.predict(x)
             Y_p[xi] = y_p
@@ -185,6 +190,7 @@ def main():
     nu = 0.1
 
     ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
+    y = scipy.io.loadmat('feats/ca01_no_label_bov_XY.mat')['Y'].ravel()[15:]
 
     # le_weird = ca01_feats[242:270, :]
     # for x in range(20):
@@ -202,6 +208,7 @@ def main():
     # numpy.random.shuffle(shuffle_inds)
 
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
+<<<<<<< HEAD
 
     kernel_params = {'sigma' : 0.005, 'bandwidth' : 0.005}
     ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 5e-4, kernel_params = kernel_params)
@@ -225,27 +232,73 @@ def main():
 
     # pdb.set_trace()
 
+=======
+    
+
+    best_accu = 0
+    best_prec = 0
+    best_recall = 0
+    best_f1 = 0
+    best_accu_choice = [0,0,0,0]
+    best_prec_choice = [0,0,0,0]
+    best_reca_choice = [0,0,0,0]
+    best_f1_choice = [0,0,0,0]
+
+    stepsize = 5e-3
+    for nu in np.arange(stepsize, 1, stepsize):
+        for eta in np.arange(stepsize, 1, stepsize):
+            for sigma in [1e-3, 3e-3, 6e-3, 1e-2, 2e-2, 4e-2, 6e-2, 8e-2, 1e-1]:
+                for lam in [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1, 1e1, 1e2, 1e3, 1e4]:
+                    ocn = one_class_norma(nu = nu, lam = lam, eta = eta, kernel_params = {'sigma' : sigma})
+                    y_p, rhos = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)))
+
+                    y_p_fixed = numpy.zeros_like(y_p)
+                    y_p_fixed[shuffle_inds] = y_p
+
+                    rhos_fixed = numpy.zeros_like(rhos)
+                    rhos_fixed[shuffle_inds] = rhos
+
+                    y_hat = (y_p_fixed <= rhos_fixed).ravel()
+                    
+                    accu = np.sum(y_hat == y) / np.float64(y.shape[0])
+                    tp = np.sum((y_hat==1) * (y==1))
+                    fp = np.sum((y_hat==1) * (y==0))
+                    tn = np.sum((y_hat==0) * (y==0))
+                    fn = np.sum((y_hat==0) * (y==1))
+                    prec = tp / np.float(tp + fp) 
+                    recall = tp / np.float(tp + fn)
+                    f1 = 2* prec * recall / (prec + recall)
+                    if accu > best_accu:
+                        best_accu = accu
+                        best_accu_choice = [nu, eta, sigma, lam]
+                        print "accu {} [ {} {} {} {} ]".format(accu, nu, eta, sigma, lam)
+                    if prec > best_prec:
+                        best_prec = prec
+                        best_prec_choice = [nu, eta, sigma, lam]
+                        print "prec {} [ {} {} {} {} ]".format(prec, nu, eta, sigma, lam)
+                    if recall > best_recall:
+                        best_recall = recall
+                        best_reca_choice = [nu, eta, sigma, lam]
+                        print "recall {} [ {} {} {} {} ]".format(recall, nu, eta, sigma, lam)
+                    if f1 > best_f1:
+                        best_f1 = f1
+                        best_f1_choice = [nu, eta, sigma, lam]
+                        print "f1 {} [ {} {} {} {} ]".format(f1, nu, eta, sigma, lam)
+>>>>>>> 53a6bb46756312ce5eb8ba6c5dea862250eecd51
 
     # synth_data = numpy.vstack((numpy.arange(9, 10, .1)[:,numpy.newaxis], 
     #                            numpy.arange(19, 20, .1)[:, numpy.newaxis]))
                        
     # y_p,rhos = ocn.evaluate(synth_data,
     #                         numpy.zeros((synth_data.shape[0], 1)))
-    y_p, rhos = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)))
-
-    y_p_fixed = numpy.zeros_like(y_p)
-    y_p_fixed[shuffle_inds] = y_p
-
-    rhos_fixed = numpy.zeros_like(rhos)
-    rhos_fixed[shuffle_inds] = rhos
-
     plt.plot(range(y_p.shape[0]), y_p_fixed)
     plt.plot(range(rhos.shape[0]), rhos_fixed)
     plt.show(block = False)
     pdb.set_trace()
     
 if __name__ == '__main__':
-    pdbw.pdbwrap(main)()
+    #pdbw.pdbwrap(main)()
+    main()
         
 
     
