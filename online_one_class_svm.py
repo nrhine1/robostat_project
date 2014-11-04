@@ -83,7 +83,9 @@ class one_class_norma(object):
         self.eta = eta
 
         self.t = 1
-        self.tau = 1000
+        self.beta_counter = 1
+        self.tau = 10000
+        
 
 
         self.rho = 1
@@ -91,6 +93,8 @@ class one_class_norma(object):
         self.alphas = []
 
         self.xs = []
+
+        self.bt_offsets = []
 
         self.kernel_params = kernel_params
         self.kernel_type = kernel_type
@@ -118,7 +122,7 @@ class one_class_norma(object):
         
 
         for i in irange:
-            beta_idx = self.t - i - 2
+            beta_idx = self.beta_counter - i - 2
             # print "beta: ", self.betas[beta_idx]
             # print "ke: ", ke
             # print "alpha: {}".format(self.alphas[i])
@@ -127,7 +131,8 @@ class one_class_norma(object):
                                   self.xs[i],
                                   self.kernel_params)
 
-            pred += self.alphas[i] * self.betas[beta_idx] * ke#[i]
+            # pred += self.alphas[i] * self.betas[self.t + self.bt_offsets[beta_idx]] * ke#[i]
+            pred += self.alphas[i] * self.betas[self.beta_counter - (i + self.bt_offsets[beta_idx]) - 2] * ke#[i]
             # print "pred: {}".format(pred)
 
         # print "pred final: {}\n\n".format(pred)
@@ -146,22 +151,26 @@ class one_class_norma(object):
             self.alphas.append(self.eta)
             self.rho += self.eta * (1 - self.nu)
 
+
+            # avoid storing the xs
+            self.xs.append(x)
+            self.t += 1
+
+
         # normal... rho decreases
         else:
-            self.alphas.append(0)
+            # self.alphas.append(0)
             self.rho += - self.eta * self.nu
 
-        #todo... really store this x?
-
-        self.xs.append(x)
-        self.t += 1
+        self.beta_counter += 1
+        self.bt_offsets.append(self.beta_counter - self.t)
 
         assert(len(self.xs) == len(self.alphas))
 
         assert(self.t - 1 == len(self.xs))
 
             
-    def evaluate(self, X, Y):
+    def evaluate(self, X, Y, stop_idx = None):
 
         Y_p = numpy.zeros_like(Y)
         rhos = numpy.zeros_like(Y)
@@ -176,8 +185,8 @@ class one_class_norma(object):
             rhos[xi] = self.rho
 
             # TODO SUPER HACK
-            # if xi < 300:
-            self.fit(x, pred = y_p)
+            if stop_idx is not None and xi < stop_idx:
+                self.fit(x, pred = y_p)
         return Y_p, rhos
         
             
@@ -185,11 +194,19 @@ def main():
     nu = 0.1
 
     ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
+    ca02_feats_orig = numpy.load('feats/ca02_no_label_bov.npz')['arr_0'][15:]
 
-    # le_weird = ca01_feats[242:270, :]
-    # for x in range(20):
-    #     ca01_feats = numpy.vstack((ca01_feats, le_weird))
-    # ca01_feats = numpy.vstack((ca01_feats, ca01_feats))
+    train_test_idx = 400
+    n_duplicates = 0
+    le_weird = ca01_feats_orig[train_test_idx:, :]
+    le_normal = ca01_feats_orig[:train_test_idx, :]
+
+    ca01_feats_orig = le_normal
+    for x in range(n_duplicates):
+        ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_normal))
+
+    stop_training_idx = ca01_feats_orig.shape[0]
+    ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_weird))
 
     # ca01_feats = numpy.hstack((ca01_feats, numpy.ones((ca01_feats.shape[0], 1))))
 
@@ -204,7 +221,7 @@ def main():
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
 
     kernel_params = {'sigma' : 0.005, 'bandwidth' : 0.005}
-    ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 5e-4, kernel_params = kernel_params)
+    ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 1e-3, kernel_params = kernel_params)
 
     # kernel_surface = numpy.zeros((ca01_feats.shape[0], ca01_feats.shape[0]))
     # print "computing kernel surface"
@@ -231,7 +248,8 @@ def main():
                        
     # y_p,rhos = ocn.evaluate(synth_data,
     #                         numpy.zeros((synth_data.shape[0], 1)))
-    y_p, rhos = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)))
+    y_p, rhos = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)),
+                             stop_idx = stop_training_idx)
 
     y_p_fixed = numpy.zeros_like(y_p)
     y_p_fixed[shuffle_inds] = y_p
@@ -239,8 +257,12 @@ def main():
     rhos_fixed = numpy.zeros_like(rhos)
     rhos_fixed[shuffle_inds] = rhos
 
-    plt.plot(range(y_p.shape[0]), y_p_fixed)
-    plt.plot(range(rhos.shape[0]), rhos_fixed)
+    y_p_2, rhos_2 = ocn.evaluate(ca02_feats_orig, numpy.zeros((ca02_feats_orig.shape[0], 1)),
+                                 stop_idx = 0)
+
+
+    plt.plot(range(y_p_2.shape[0]), y_p_2)
+    plt.plot(range(rhos_2.shape[0]), rhos_2)
     plt.show(block = False)
     pdb.set_trace()
     
