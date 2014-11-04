@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
+
 import numpy
 import numpy as np
 import pdb
 import gtkutils.pdbwrap as pdbw
+import gtkutils.img_util as iu
 
 class online_one_class_svm(object):
     def __init__(self, nu, feature_size, phi=None):
@@ -56,7 +60,21 @@ def poly_kernel_func(x0, x1, kernel_params):
     return numpy.power((numpy.dot(x0, x1) + kernel_params['c']), kernel_params['d'])
 
 def gaussian_kernel_func(x0, x1, kernel_params):
-    return 1 / (kernel_params['sigma'] * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1)/ kernel_params['sigma'], 2))
+    if x0.ndim == 2 or x1.ndim == 2:
+        axis = 1
+    else:
+        axis = 0
+        
+    return 1 / (kernel_params['sigma'] * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1, axis = axis)/ kernel_params['sigma'], 2))
+
+def uniform_kernel_func(x0, x1, kernel_params):
+    if x0.ndim == 2 or x1.ndim == 2:
+        axis = 1
+    else:
+        axis = 0
+
+    distance = numpy.linalg.norm(x0 - x1, axis = axis)
+    return .5 * ( distance < float(kernel_params['bandwidth']))
 
 class one_class_norma(object):
     def __init__(self, nu, lam, eta, kernel_type = 'gaussian', kernel_params = {'c': 1, 'd' : 2}):
@@ -65,7 +83,7 @@ class one_class_norma(object):
         self.eta = eta
 
         self.t = 1
-        self.tau = 100
+        self.tau = 1000
 
 
         self.rho = 1
@@ -81,7 +99,8 @@ class one_class_norma(object):
             self.kernel_func = poly_kernel_func
         elif self.kernel_type == 'gaussian':
             self.kernel_func = gaussian_kernel_func
-
+        elif self.kernel_type == 'uniform':
+            self.kernel_func = uniform_kernel_func
         else:
             raise RuntimeError("unknown kernel: {}".format(kernel_type))
 
@@ -91,18 +110,24 @@ class one_class_norma(object):
             return pred
 
         # print "pred"
-        for i in range(max(0, self.t - self.tau - 1), self.t - 1):
+        irange = range(max(0, self.t - self.tau - 1), self.t - 1)
+        
+        # ke = self.kernel_func(x, 
+        #                       numpy.asarray(self.xs)[irange, :],
+        #                       self.kernel_params)
+        
+
+        for i in irange:
             beta_idx = self.t - i - 2
             # print "beta: ", self.betas[beta_idx]
-            ke = self.kernel_func(x, 
-                                  self.xs[i],
-                                  self.kernel_params)
             # print "ke: ", ke
             # print "alpha: {}".format(self.alphas[i])
 
-            pred += self.alphas[i] * self.betas[beta_idx] * self.kernel_func(x, 
-                                                                             self.xs[i],
-                                                                             self.kernel_params)
+            ke = self.kernel_func(x, 
+                                  self.xs[i],
+                                  self.kernel_params)
+
+            pred += self.alphas[i] * self.betas[beta_idx] * ke#[i]
             # print "pred: {}".format(pred)
 
         # print "pred final: {}\n\n".format(pred)
@@ -150,7 +175,9 @@ class one_class_norma(object):
             Y_p[xi] = y_p
             rhos[xi] = self.rho
 
-            self.fit(x, pred = y_p)
+            # TODO SUPER HACK
+            if xi < 500:
+                self.fit(x, pred = y_p)
         return Y_p, rhos
         
             
@@ -171,9 +198,33 @@ def main():
     # y_p = oocs.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)))
    
     shuffle_inds = numpy.asarray(range(ca01_feats_orig.shape[0]))
-    numpy.random.shuffle(shuffle_inds)
+
+    # numpy.random.shuffle(shuffle_inds)
+
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
-    ocn = one_class_norma(nu = .9, lam = 1e-4, eta = 1e-2, kernel_params = {'sigma' : 0.001})
+
+    kernel_params = {'sigma' : 0.005, 'bandwidth' : 0.005}
+    ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 5e-4, kernel_params = kernel_params)
+
+    # kernel_surface = numpy.zeros((ca01_feats.shape[0], ca01_feats.shape[0]))
+    # print "computing kernel surface"
+    # for point_idx in range(ca01_feats.shape[0]):
+    #     point = ca01_feats[point_idx, :]
+    #     kernel_eval = uniform_kernel_func(point, ca01_feats, kernel_params)
+    #     kernel_surface[point_idx, :] = kernel_eval
+
+    # normalized_surface = kernel_surface / (kernel_surface.max() - kernel_surface.min())
+    # # xmesh, ymesh = numpy.meshgrid(range(ca01_feats.shape[0]), range(ca01_feats.shape[0]))
+    # iu.v(normalized_surface)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection = '3d')
+    # ax.plot_surface(xmesh, ymesh, kernel_surface, cmap = cm.coolwarm)
+    
+    # ### params
+
+    # pdb.set_trace()
+
 
     # synth_data = numpy.vstack((numpy.arange(9, 10, .1)[:,numpy.newaxis], 
     #                            numpy.arange(19, 20, .1)[:, numpy.newaxis]))
