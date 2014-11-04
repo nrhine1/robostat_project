@@ -127,12 +127,15 @@ class one_class_norma(object):
             # print "ke: ", ke
             # print "alpha: {}".format(self.alphas[i])
 
+            if self.alphas[i] == 0:
+                continue
+
             ke = self.kernel_func(x, 
                                   self.xs[i],
                                   self.kernel_params)
 
-            # pred += self.alphas[i] * self.betas[self.t + self.bt_offsets[beta_idx]] * ke#[i]
-            pred += self.alphas[i] * self.betas[self.beta_counter - (i + self.bt_offsets[beta_idx]) - 2] * ke#[i]
+            pred += self.alphas[i] * self.betas[beta_idx] * ke
+            # pred += self.alphas[i] * self.betas[self.beta_counter - (i + self.bt_offsets[beta_idx]) - 2] * ke#[i]
             # print "pred: {}".format(pred)
 
         # print "pred final: {}\n\n".format(pred)
@@ -151,16 +154,14 @@ class one_class_norma(object):
             self.alphas.append(self.eta)
             self.rho += self.eta * (1 - self.nu)
 
-
-            # avoid storing the xs
-            self.xs.append(x)
-            self.t += 1
-
-
         # normal... rho decreases
         else:
-            # self.alphas.append(0)
+            self.alphas.append(0)
             self.rho += - self.eta * self.nu
+
+        
+        self.xs.append(x)
+        self.t += 1
 
         self.beta_counter += 1
         self.bt_offsets.append(self.beta_counter - self.t)
@@ -196,7 +197,7 @@ def main():
     ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
     ca02_feats_orig = numpy.load('feats/ca02_no_label_bov.npz')['arr_0'][15:]
 
-    train_test_idx = 400
+    train_test_idx = 350
     n_duplicates = 0
     le_weird = ca01_feats_orig[train_test_idx:, :]
     le_normal = ca01_feats_orig[:train_test_idx, :]
@@ -259,10 +260,11 @@ def main():
 
     y_p_2, rhos_2 = ocn.evaluate(ca02_feats_orig, numpy.zeros((ca02_feats_orig.shape[0], 1)),
                                  stop_idx = 0)
-
-
     plt.plot(range(y_p_2.shape[0]), y_p_2)
     plt.plot(range(rhos_2.shape[0]), rhos_2)
+    # plt.plot(range(y_p.shape[0]), y_p)
+    # plt.plot(range(rhos.shape[0]), rhos)
+
     plt.show(block = False)
     pdb.set_trace()
     
