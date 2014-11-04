@@ -176,8 +176,8 @@ class one_class_norma(object):
             rhos[xi] = self.rho
 
             # TODO SUPER HACK
-            if xi < 500:
-                self.fit(x, pred = y_p)
+            # if xi < 300:
+            self.fit(x, pred = y_p)
         return Y_p, rhos
         
             
