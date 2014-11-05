@@ -175,7 +175,12 @@ class one_class_norma(object):
 
         Y_p = numpy.zeros_like(Y)
         rhos = numpy.zeros_like(Y)
+        classification = numpy.zeros_like(Y)
+        
+        consec_anomaly_thresh = 4
 
+        consec_anomaly = 0
+        min_non_anomaly_frames = stop_idx
 
         for (xi, x) in enumerate(X):
             if xi % 20:
@@ -185,10 +190,19 @@ class one_class_norma(object):
             Y_p[xi] = y_p
             rhos[xi] = self.rho
 
+            if y_p < self.rho and xi > stop_idx:
+                consec_anomaly += 1
+            else:
+                consec_anomaly = 0
+
+            if consec_anomaly >= consec_anomaly_thresh:
+                for i in range(consec_anomaly_thresh):
+                    classification[xi - i] = 1
+
             # TODO SUPER HACK
             if stop_idx is not None and xi < stop_idx:
                 self.fit(x, pred = y_p)
-        return Y_p, rhos
+        return Y_p, rhos, classification
         
             
 def main():
@@ -197,7 +211,7 @@ def main():
     ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
     ca02_feats_orig = numpy.load('feats/ca02_no_label_bov.npz')['arr_0'][15:]
 
-    train_test_idx = 350
+    train_test_idx = 480
     n_duplicates = 0
     le_weird = ca01_feats_orig[train_test_idx:, :]
     le_normal = ca01_feats_orig[:train_test_idx, :]
@@ -228,7 +242,7 @@ def main():
     # print "computing kernel surface"
     # for point_idx in range(ca01_feats.shape[0]):
     #     point = ca01_feats[point_idx, :]
-    #     kernel_eval = uniform_kernel_func(point, ca01_feats, kernel_params)
+    #     kernel_eval = gaussian_kernel_func(point, ca01_feats, kernel_params)
     #     kernel_surface[point_idx, :] = kernel_eval
 
     # normalized_surface = kernel_surface / (kernel_surface.max() - kernel_surface.min())
@@ -249,8 +263,9 @@ def main():
                        
     # y_p,rhos = ocn.evaluate(synth_data,
     #                         numpy.zeros((synth_data.shape[0], 1)))
-    y_p, rhos = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)),
-                             stop_idx = stop_training_idx)
+    y_p, rhos, classification = ocn.evaluate(ca01_feats, numpy.zeros((ca01_feats.shape[0], 1)),
+                                             stop_idx = stop_training_idx)
+    test_classification = classification[stop_training_idx:]
 
     y_p_fixed = numpy.zeros_like(y_p)
     y_p_fixed[shuffle_inds] = y_p
@@ -258,13 +273,31 @@ def main():
     rhos_fixed = numpy.zeros_like(rhos)
     rhos_fixed[shuffle_inds] = rhos
 
-    y_p_2, rhos_2 = ocn.evaluate(ca02_feats_orig, numpy.zeros((ca02_feats_orig.shape[0], 1)),
-                                 stop_idx = 0)
-    plt.plot(range(y_p_2.shape[0]), y_p_2)
-    plt.plot(range(rhos_2.shape[0]), rhos_2)
-    # plt.plot(range(y_p.shape[0]), y_p)
-    # plt.plot(range(rhos.shape[0]), rhos)
+    # y_p_2, rhos_2 = ocn.evaluate(ca02_feats_orig, numpy.zeros((ca02_feats_orig.shape[0], 1)),
+    #                              stop_idx = 0)
+    # plt.plot(range(y_p_2.shape[0]), y_p_2)
+    # plt.plot(range(rhos_2.shape[0]), rhos_2)
 
+    y_p_training = y_p[:stop_training_idx]
+    y_p_testing = y_p[stop_training_idx:]
+
+    plt.plot(range(y_p_training.shape[0]), y_p_training, 'g', label='f(x) training')
+    plt.plot(range(y_p_training.shape[0], y_p.shape[0]), y_p_testing, 'b', label='f(x) testing')
+    plt.plot(range(rhos.shape[0]), rhos, 'k', label=u'\u03C1')
+
+    plt.title('Sequence Frame vs. NORMA One Class SVM Training and Testing Predictions')
+
+    # plt.plot(range(stop_training_idx, classification.shape[0]), 
+    #          test_classification, 'rx', label='classification')
+
+    
+    plt.ylim(ymin = min(-0.05, plt.ylim()[0]))
+
+    plt.xlabel('Frame Number')
+    plt.ylabel('Score')
+    plt.legend()
+
+    
     plt.show(block = False)
     pdb.set_trace()
     
