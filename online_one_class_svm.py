@@ -222,7 +222,8 @@ def main():
 
     stop_training_idx = ca01_feats_orig.shape[0]
     ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_weird))
-
+    
+    ca01_feats_orig = numpy.vstack((ca01_feats_orig, ca02_feats_orig))
     # ca01_feats = numpy.hstack((ca01_feats, numpy.ones((ca01_feats.shape[0], 1))))
 
     # oocs = online_one_class_svm(nu, ca01_feats.shape[1])
