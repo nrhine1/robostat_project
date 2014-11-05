@@ -5,6 +5,9 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import numpy
 import numpy as np
+
+import sklearn.metrics
+
 import pdb
 import gtkutils.pdbwrap as pdbw
 import gtkutils.img_util as iu
@@ -208,13 +211,13 @@ class one_class_norma(object):
 def main():
     nu = 0.1
 
-    ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
-    ca02_feats_orig = numpy.load('feats/ca02_no_label_bov.npz')['arr_0'][15:]
+    seq1 = '09'
+    seq2 = '10'
+    ca01_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq1))['arr_0'][15:]
+    ca02_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq2))['arr_0'][15:]
 
-    ca01_labels = numpy.load('data/ca01_no_label_bov_labels.npz')['arr_0'][15:]
-    ca02_labels = numpy.load('data/ca02_no_label_bov_labels.npz')['arr_0'][15:]
-
-
+    ca01_labels = numpy.load('data/ca{}_no_label_bov_labels.npz'.format(seq1))['arr_0'][15:]
+    ca02_labels = numpy.load('data/ca{}_no_label_bov_labels.npz'.format(seq2))['arr_0'][15:]
 
     train_test_idx = 480
     n_duplicates = 0
@@ -253,8 +256,11 @@ def main():
 
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
 
-    kernel_params = {'sigma' : 0.005, 'bandwidth' : 0.005}
-    ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 1e-3, kernel_params = kernel_params)
+    kernel_params = {'sigma' : 0.005, 'bandwidth' : 0.01}
+    kernel_type = 'gaussian'
+    ocn = one_class_norma(nu = 1e-2, lam = .3, eta = 1e-3, 
+                          kernel_type = kernel_type,
+                          kernel_params = kernel_params)
 
     # kernel_surface = numpy.zeros((ca01_feats.shape[0], ca01_feats.shape[0]))
     # print "computing kernel surface"
@@ -320,6 +326,26 @@ def main():
 
     
     plt.show(block = False)
+    
+    cm = sklearn.metrics.confusion_matrix(classification[stop_training_idx:],
+                                         all_labels[stop_training_idx:])
+
+    accuracy = numpy.diag(cm).sum() / float(cm.sum())
+    recall = cm[1][1] / float(cm[:, 1].sum())
+    precision = cm[0][0] / float(cm[:, 0].sum())
+
+    print "p r a ntrain ntest trainanomalies test normalities :\n{:.3f} & {:.3f} & {:.3f} & {}& {} & {} & {} ".format(precision, recall, accuracy, \
+                                                                                                                   all_labels[:stop_training_idx].shape[0],
+                                                                                                                   all_labels[stop_training_idx:].shape[0],
+                                                                                                                   (all_labels[stop_training_idx:] == 1).sum(),
+                                                                                                                   (all_labels[stop_training_idx:] == 0).sum())
+                                                                                                                   
+
+        # 01 and 02 480 : 0.841 & 0.995 & 0.875
+    # 01 480: 0.103 & 1.000 & 0.783
+    # 01 300: 0.732 & 1.000 & 0.813 
+    # 01 100: 0.653 & 1.000 & 0.716 
+
     pdb.set_trace()
     
 if __name__ == '__main__':
