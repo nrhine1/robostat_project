@@ -211,19 +211,36 @@ def main():
     ca01_feats_orig = numpy.load('feats/ca01_no_label_bov.npz')['arr_0'][15:]
     ca02_feats_orig = numpy.load('feats/ca02_no_label_bov.npz')['arr_0'][15:]
 
+    ca01_labels = numpy.load('data/ca01_no_label_bov_labels.npz')['arr_0'][15:]
+    ca02_labels = numpy.load('data/ca02_no_label_bov_labels.npz')['arr_0'][15:]
+
+
+
     train_test_idx = 480
     n_duplicates = 0
+    stack_next_seq = True
+
     le_weird = ca01_feats_orig[train_test_idx:, :]
     le_normal = ca01_feats_orig[:train_test_idx, :]
+    le_normal_labels = ca01_labels[:train_test_idx, :]
+    le_weird_labels = ca01_labels[train_test_idx:, :]
 
     ca01_feats_orig = le_normal
+    ca01_labels = le_normal_labels
+
     for x in range(n_duplicates):
         ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_normal))
+        ca01_labels = numpy.vstack((ca01_labels, le_normal_labels))
 
     stop_training_idx = ca01_feats_orig.shape[0]
     ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_weird))
-    
-    ca01_feats_orig = numpy.vstack((ca01_feats_orig, ca02_feats_orig))
+    ca01_labels = numpy.vstack((ca01_labels, le_weird_labels))
+
+    all_labels = ca01_labels
+    if stack_next_seq:
+        ca01_feats_orig = numpy.vstack((ca01_feats_orig, ca02_feats_orig))
+        all_labels = numpy.vstack((ca01_labels, ca02_labels))
+
     # ca01_feats = numpy.hstack((ca01_feats, numpy.ones((ca01_feats.shape[0], 1))))
 
     # oocs = online_one_class_svm(nu, ca01_feats.shape[1])
@@ -286,6 +303,9 @@ def main():
     plt.plot(range(y_p_training.shape[0], y_p.shape[0]), y_p_testing, 'b', label='f(x) testing')
     plt.plot(range(rhos.shape[0]), rhos, 'k', label=u'\u03C1')
 
+    plt.plot(range(all_labels.shape[0]), all_labels, 'rx', label='GT label')
+
+
     plt.title('Sequence Frame vs. NORMA One Class SVM Training and Testing Predictions')
 
     # plt.plot(range(stop_training_idx, classification.shape[0]), 
@@ -296,7 +316,7 @@ def main():
 
     plt.xlabel('Frame Number')
     plt.ylabel('Score')
-    plt.legend()
+    plt.legend(fontsize = 10)
 
     
     plt.show(block = False)
