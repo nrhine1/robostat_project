@@ -34,7 +34,46 @@ def gaussian_kernel_func(x0, x1, sigma=0.005):
         axis = 0
     return 1 / (sigma * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1, axis = axis)/ sigma, 2))
 
+class Mode(object):
+    def __init__(self, mean, lam=1e-3):
+        self.sum1 = mean
+        self.sum2 = np.outer(mean, mean) + lam * np.eye(mean.shape[0])
+        self.n_points = 1.
 
+    def mean(self):
+        return self.sum1 / self.n_points
+
+    def cov(self):
+        return self.sum2 / self.n_points
+
+    def update(self, x):
+        self.sum1 += x
+        self.sum2 += np.outer(x, x)
+        self.n_points += 1
+
+    def weight_pt(self, x):
+        return self.n_points * scipy.stats.multivariate_normal(x, self.mean(), self.cov())
+        
+
+class online_meanshift2(object):
+    def __init__(self):
+        self.modes = []
+        self.t = 1.0
+
+    def mean_shift(self, x):
+        weights = [ mode.weight_pt(x) for mode in self.modes]
+        default_weight = meow(self.t)
+        weights.append(default_weight)
+        
+        max_mode_i = np.argmax(weights)
+        # need to also consider the spawning case: 
+        if  default_weight < weights[max_mode_i]:
+            max_mode = self.modes(max_mode_i)
+            max_mode.update(x)
+        else:
+            # spawn new mode
+            self.modes.append(Mode(x))
+        
 class online_meanshift:
     modes = np.array([]) # List of modes: KxD
     assigments = np.array([]) # Indices into modes
