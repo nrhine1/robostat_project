@@ -1,8 +1,11 @@
 import numpy as np
+import pdb
 import numpy.random as rnd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+from online_meanshift import online_meanshift3
 
 #def DisplayClrPts(fout, locs, yhat, node_labels, classes):
 #    clrs = np.array(('g','k','b','brown','y'))
@@ -58,13 +61,25 @@ class3 = rnd.multivariate_normal(mu3, Sigma3, N3) # Anomaly class
 toy_lbls = np.vstack((1*np.ones((N1/2,1)), 3*np.ones((1,1)), 2*np.ones((N2/2,1)), 1*np.ones((N1/2,1)), 2*np.ones((N1/2+1,1)), 3*np.ones((N3-1,1)))).astype(int) - 1
 toy_feats = np.vstack((class1[:(N1/2),:], class3[1,:], class2[:(N2/2),:], class1[(N1/2):,:], class2[(N1/2+1):,:], class3[1:,:]))
 
+oms = online_meanshift3(3, 25, 15)
+
+
 fig = plt.figure()
 ax = plt.subplot(111, projection='3d')
+
+
 
 clrs = np.array(('g','b','r','k','brown','y'))
 N = toy_feats.shape[0]
 for i in range(N):
+    oms.fit(toy_feats[i])
+
     ax = Display3DPts(ax, toy_feats[np.newaxis,i,:], clrs[toy_lbls[i]])
+    
+    print len(oms.modes)
+    for mode in oms.modes:
+        ax = Display3DPts(ax, mode[np.newaxis, :], clrs[3])
+
     plt.savefig('figs/{}.jpg'.format(i))
     print "{}/{}".format(i,N)
 plt.show()

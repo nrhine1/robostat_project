@@ -46,7 +46,7 @@ class online_meanshift3:
         self.n_buffered = 0
         self.sample_buffer = np.zeros((batch_size, feature_size), dtype=np.float64)
 
-        self.sigmasquare = #meow
+        self.sigmasquare = 0.1
 
         self.modes = []
         self.mode_weights = []
@@ -55,7 +55,7 @@ class online_meanshift3:
         # x1 : (m,d)
         # x2 : (n,d)
         # ret: (m,n) of dists 
-        return np.exp(-(np.sum((x1[:,np.newaxis,:] - x2)**2), axis=2) / self.sigmasquare)
+        return np.exp(-(np.sum((x1[:,np.newaxis,:] - x2)**2, axis=2) / self.sigmasquare))
 
     def fit(self, x):
         # use mean shift on x with the samples to find its mode.
@@ -78,7 +78,7 @@ class online_meanshift3:
                 has_found = False
                 for mode_i, mode in enumerate(self.modes):
                     d = np.sum((mode - seeds)**2)
-                    if d < 0.1 * self.sigmasquare:
+                    if d < 0.25 * self.sigmasquare:
                         #duplicate node
                         has_found = True
                         break
@@ -102,13 +102,13 @@ class online_meanshift3:
 
     def update_samples(self, x):
         if self.n_samples < self.max_nbr_samples:
-            self.samples[n_samples] = x
+            self.samples[self.n_samples] = x
             self.n_samples += 1
         else:
             r_num = np.random.uniform(0,1) * self.t
             if r_num < 1:
                 # record the sample with prob.
-                idx = int32(r_num * self.max_nbr_samples)
+                idx = int(r_num * self.max_nbr_samples)
                 self.samples[idx] = x     
 
 class Mode(object):
