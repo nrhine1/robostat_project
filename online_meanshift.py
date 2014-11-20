@@ -79,7 +79,7 @@ class online_meanshift3:
             for seed in seeds:
                 has_found = False
                 for mode_i, mode in enumerate(self.modes):
-                    d = np.sum((mode - seeds)**2)
+                    d = np.linalg.norm(mode - seed)**2
                     if d < 0.25 * self.sigmasquare:
                         #duplicate node
                         has_found = True
