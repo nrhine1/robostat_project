@@ -34,6 +34,83 @@ def gaussian_kernel_func(x0, x1, sigma=0.005):
         axis = 0
     return 1 / (sigma * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1, axis = axis)/ sigma, 2))
 
+class online_meanshift3:
+    def __init__(self, feature_size, max_nbr_samples = 200, batch_size=100):
+        self.samples = np.zeros((max_nbr_samples, feature_size), dtype=np.float64)
+        self.max_nbr_samples = max_nbr_samples
+        self.feature_size = feature_size
+        self.n_samples = 0
+        self.t = 1.0
+
+        self.batch_size = batch_size
+        self.n_buffered = 0
+        self.sample_buffer = np.zeros((batch_size, feature_size), dtype=np.float64)
+
+        self.sigmasquare = 0.1
+
+        self.modes = []
+        self.mode_weights = []
+
+    def compute_weight(self, x1, x2):
+        # x1 : (m,d)
+        # x2 : (n,d)
+        # ret: (m,n) of dists 
+        return np.exp(-(np.sum((x1[:,np.newaxis,:] - x2)**2, axis=2) / self.sigmasquare))
+
+    def fit(self, x):
+        # use mean shift on x with the samples to find its mode.
+        
+        self.sample_buffer[self.n_buffered] = x
+        self.n_buffered += 1
+
+        if self.batch_size == self.n_buffered:
+            # do mean shift on both stored samples, and buffered samples. 
+            seeds = self.sample_buffer.copy()
+
+            # mean shift
+            for i in range(200):
+                w1 = self.compute_weight(seeds, self.samples[:self.n_samples])
+                w2 = self.compute_weight(seeds, self.sample_buffer)
+                seeds = (np.dot(w1, self.samples[:self.n_samples]) + np.dot(w2, self.sample_buffer)) / (np.sum(w1, axis=1) + np.sum(w2, axis=1))[:,np.newaxis]
+
+            # for each seed determine whether it is new.
+            for seed in seeds:
+                has_found = False
+                for mode_i, mode in enumerate(self.modes):
+                    d = np.sum((mode - seeds)**2)
+                    if d < 0.25 * self.sigmasquare:
+                        #duplicate node
+                        has_found = True
+                        break
+                if not has_found:
+                    self.modes.append(seed)
+                    self.mode_weights.append(1.0)
+                    # definitely abnormal TODO
+                else:
+                    self.modes[mode_i] = (self.modes[mode_i] * self.mode_weights[mode_i] + seed) / (self.mode_weights[mode_i] + 1)
+                    self.mode_weights[mode_i] += 1
+                    # compute abnormal scale TODO
+
+            # update saved samples
+            for spl in self.sample_buffer:
+                self.update_samples(spl)
+                self.t += 1.
+
+            # clear buffer
+            self.n_buffered = 0
+
+
+    def update_samples(self, x):
+        if self.n_samples < self.max_nbr_samples:
+            self.samples[self.n_samples] = x
+            self.n_samples += 1
+        else:
+            r_num = np.random.uniform(0,1) * self.t
+            if r_num < 1:
+                # record the sample with prob.
+                idx = int(r_num * self.max_nbr_samples)
+                self.samples[idx] = x     
+
 class Mode(object):
     def __init__(self, mean, lam=1e-3):
         self.sum1 = mean
