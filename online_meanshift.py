@@ -63,7 +63,9 @@ class online_meanshift3:
         self.sample_buffer[self.n_buffered] = x
         self.n_buffered += 1
 
+        n_modes_added = 0
         if self.batch_size == self.n_buffered:
+            print "doing mean shift"
             # do mean shift on both stored samples, and buffered samples. 
             seeds = self.sample_buffer.copy()
 
@@ -85,6 +87,7 @@ class online_meanshift3:
                 if not has_found:
                     self.modes.append(seed)
                     self.mode_weights.append(1.0)
+                    n_modes_added += 1
                     # definitely abnormal TODO
                 else:
                     self.modes[mode_i] = (self.modes[mode_i] * self.mode_weights[mode_i] + seed) / (self.mode_weights[mode_i] + 1)
@@ -98,6 +101,9 @@ class online_meanshift3:
 
             # clear buffer
             self.n_buffered = 0
+            print "added {} modes".format(n_modes_added)
+        else:
+            print "waiting for batch to arrive... {}/{}".format(self.n_buffered, self.batch_size)
 
 
     def update_samples(self, x):
