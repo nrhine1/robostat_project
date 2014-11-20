@@ -44,7 +44,7 @@ class Mode(object):
         return self.sum1 / self.n_points
 
     def cov(self):
-        return self.sum2 / self.n_points
+        return (self.sum2 - np.outer(self.sum1, self.sum1)) / self.n_points
 
     def update(self, x):
         self.sum1 += x
@@ -62,7 +62,7 @@ class online_meanshift2(object):
 
     def mean_shift(self, x):
         weights = [ mode.weight_pt(x) for mode in self.modes]
-        default_weight = meow(self.t)
+        default_weight = 1/self.t
         weights.append(default_weight)
         
         max_mode_i = np.argmax(weights)
@@ -81,7 +81,6 @@ class online_meanshift:
     def __init__(self):
         pass
     
-#    def InitModes(self, xtrain):
     def MeanShift(self, X, bandwidth=0.01, seeds=None, kernel_update_function=gaussian_kernel_update, max_iterations=300):
         n_points, n_features = X.shape
         stop_thresh = 1e-3 * bandwidth  # when mean has converged
