@@ -345,10 +345,12 @@ def main():
 
 
             plt.axis([0, ca01_feats_orig.shape[0], 0, 1])
-            plt.draw()
-            plt.show(block = False)
             plt.xlabel('Frame Index')
             plt.ylabel('Anomaly Score')
+            plt.title('Sequence {}'.format(seq1))
+
+            plt.draw()
+            plt.show(block = False)
 
             
     print "Done!"
