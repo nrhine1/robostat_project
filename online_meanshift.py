@@ -15,7 +15,7 @@ from sklearn.utils import extmath
 from sklearn.metrics.pairwise import euclidean_distances
 
 import pdb
-#import gtkutils.pdbwrap as pdbw
+import gtkutils.pdbwrap as pdbw
 #import gtkutils.img_util as iu
 
  
@@ -35,7 +35,7 @@ def gaussian_kernel_func(x0, x1, sigma=0.005):
     return 1 / (sigma * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1, axis = axis)/ sigma, 2))
 
 class online_meanshift3:
-    def __init__(self, feature_size, max_nbr_samples = 200, batch_size=100):
+    def __init__(self, feature_size, max_nbr_samples = 200, batch_size=100, sigmasq = 0.05):
         self.samples = np.zeros((max_nbr_samples, feature_size), dtype=np.float64)
         self.max_nbr_samples = max_nbr_samples
         self.feature_size = feature_size
@@ -46,7 +46,7 @@ class online_meanshift3:
         self.n_buffered = 0
         self.sample_buffer = np.zeros((batch_size, feature_size), dtype=np.float64)
 
-        self.sigmasquare = 0.1
+        self.sigmasquare = sigmasq
 
         self.modes = []
         self.mode_weights = []
@@ -57,42 +57,82 @@ class online_meanshift3:
         # ret: (m,n) of dists 
         return np.exp(-(np.sum((x1[:,np.newaxis,:] - x2)**2, axis=2) / self.sigmasquare))
 
+    def compute_dist(self, x1, x2):
+        assert(x1.shape[0] == 1)
+        # x1 : (1, d)
+        # x2 : (n, d)
+        return numpy.linalg.norm(x1 - x2, axis = 1)
+
     def fit(self, x):
         # use mean shift on x with the samples to find its mode.
         
         self.sample_buffer[self.n_buffered] = x
         self.n_buffered += 1
+        self.shift_indicators = numpy.zeros((len(self.modes), 1), dtype = numpy.bool)
 
         n_modes_added = 0
+        orig_num_modes = len(self.modes)
+
+
+
         if self.batch_size == self.n_buffered:
             print "doing mean shift"
             # do mean shift on both stored samples, and buffered samples. 
             seeds = self.sample_buffer.copy()
 
+            normality_scores = numpy.zeros((self.batch_size))
+            mode_assignments = numpy.zeros((self.batch_size), numpy.int32)
+
             # mean shift
             for i in range(200):
                 w1 = self.compute_weight(seeds, self.samples[:self.n_samples])
                 w2 = self.compute_weight(seeds, self.sample_buffer)
-                seeds = (np.dot(w1, self.samples[:self.n_samples]) + np.dot(w2, self.sample_buffer)) / (np.sum(w1, axis=1) + np.sum(w2, axis=1))[:,np.newaxis]
+                seeds = (np.dot(w1, self.samples[:self.n_samples]) + 
+                         np.dot(w2, self.sample_buffer)) / (np.sum(w1, axis=1) + np.sum(w2, axis=1))[:,np.newaxis]
 
             # for each seed determine whether it is new.
-            for seed in seeds:
+            for (s_idx, seed) in enumerate(seeds):
                 has_found = False
+
+                # when we add modes, future seeds will be compared to them because enumerate() is a generator
+                d = 0
+
                 for mode_i, mode in enumerate(self.modes):
                     d = np.linalg.norm(mode - seed)**2
-                    if d < 0.25 * self.sigmasquare:
+                    print d
+                    print '{} < {}'.format(d, .25 * self.sigmasquare)
+                    if d < .25 *  self.sigmasquare:
                         #duplicate node
                         has_found = True
+                        mode_assignment = mode_i
                         break
+                    
+
                 if not has_found:
                     self.modes.append(seed)
                     self.mode_weights.append(1.0)
                     n_modes_added += 1
+                    self.shift_indicators = numpy.vstack((self.shift_indicators, False))
+                    mode_assignment = len(self.modes) - 1
                     # definitely abnormal TODO
-                else:
+                else:                     
+                    #if has_found
                     self.modes[mode_i] = (self.modes[mode_i] * self.mode_weights[mode_i] + seed) / (self.mode_weights[mode_i] + 1)
                     self.mode_weights[mode_i] += 1
+                    
+                    # an old mode has shifted (don't mark new modes as shifted)
+                    if mode_i < orig_num_modes:
+                        self.shift_indicators[mode_i] = True
                     # compute abnormal scale TODO
+
+                dist_to_modes = self.compute_dist(seed[np.newaxis, ], numpy.asarray(self.modes))
+                weighted_dists = self.mode_weights * dist_to_modes
+                # normality_scores[s_idx] = weighted_dists[mode_assignment] / (numpy.sum(weighted_dists) + 
+                #                                                              numpy.finfo(numpy.float64).
+                mode_assignments[s_idx] = mode_assignment
+
+            for s_idx in range(seeds.shape[0]):
+                normality_scores[s_idx] = 1 - self.mode_weights[mode_assignments[s_idx]] / (numpy.sum(self.mode_weights))
 
             # update saved samples
             for spl in self.sample_buffer:
@@ -101,16 +141,20 @@ class online_meanshift3:
 
             # clear buffer
             self.n_buffered = 0
-            print "added {} modes".format(n_modes_added)
+            print "added {} modes, {} total".format(n_modes_added, len(self.modes))
+            return normality_scores, mode_assignments
         else:
             print "waiting for batch to arrive... {}/{}".format(self.n_buffered, self.batch_size)
-
+            return None, None
 
     def update_samples(self, x):
         if self.n_samples < self.max_nbr_samples:
             self.samples[self.n_samples] = x
             self.n_samples += 1
         else:
+            # this is weird... we care about newer points less?? maybe make it likelier to 
+            # record them if they're far
+            # away from other points in the cluster, so later points are less likely to be "novel"
             r_num = np.random.uniform(0,1) * self.t
             if r_num < 1:
                 # record the sample with prob.
@@ -123,8 +167,7 @@ class Mode(object):
         self.sum2 = np.outer(mean, mean) + lam * np.eye(mean.shape[0])
         self.n_points = 1.
 
-    def mean(self):
-        return self.sum1 / self.n_points
+    def mean(self): self.sum1 / self.n_points
 
     def cov(self):
         return self.sum2 / self.n_points
@@ -212,6 +255,14 @@ class online_meanshift:
     def Evaluate(self):
         pass
 
+def compute_pairwise_dists(X1, X2):
+    pd = numpy.zeros((X1.shape[0], X2.shape[0]))
+    for (x1i, x1) in enumerate(X1):
+        for (x2i, x2) in enumerate(X2):
+            d = numpy.linalg.norm(x1 - x2) ** 2
+            pd[x1i, x2i] = d
+
+    return pd
 
 def main():
     seq1 = '09'
@@ -238,13 +289,48 @@ def main():
     shuffle_inds = numpy.asarray(range(ca01_feats_orig.shape[0]))
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
     
-    oms = online_meanshift()
-    oms.MeanShift(ca01_feats[:100,:])
-    oms.Test()
-    oms.Evaluate()
+    # oms = online_meanshift()
+    # oms.MeanShift(ca01_feats[:100,:])
+    # oms.Test()
+    # oms.Evaluate()
 
+    oms = online_meanshift3(feature_size = ca01_feats_orig.shape[1],
+                            max_nbr_samples = 100,
+                            batch_size = 10,
+                            sigmasq = 1e-5)
+
+    all_normality_scores = numpy.zeros((ca01_feats_orig.shape[0]))
+    all_mode_assignments = numpy.zeros((ca01_feats_orig.shape[0]))
+
+    batch_idx = 0
+    for i in range(ca01_feats_orig.shape[0]):
+        normality_scores, mode_assignments = oms.fit(ca01_feats_orig[i, :])
+
+        if normality_scores is not None:
+            all_normality_scores[batch_idx * oms.batch_size : 
+                                 (batch_idx + 1) * oms.batch_size] = normality_scores
+
+            all_mode_assignments[batch_idx * oms.batch_size : 
+                                 (batch_idx + 1) * oms.batch_size] = mode_assignments
+
+            batch_idx += 1
+            sample_idx = batch_idx * oms.batch_size
+            print "on sample {}".format(sample_idx)
+                
+            plt.cla()
+            plt.plot(range(ca01_feats_orig.shape[0]), all_normality_scores)
+            plt.scatter(range(ca01_feats_orig.shape[0]), 
+                        all_mode_assignments / 100.0 + 1/100.,
+                        linewidths = 1.0)
+
+            plt.axis([0, ca01_feats_orig.shape[0], 0, 1])
+            plt.draw()
+            plt.show(block = False)
+
+            
     print "Done!"
 
+
 if __name__ == '__main__':
-    #pdbw.pdbwrap(main)()
-    main()    
+    pdbw.pdbwrap(main)()
+    # main()    
