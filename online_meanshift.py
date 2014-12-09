@@ -277,7 +277,7 @@ def compute_pairwise_dists(X1, X2):
     return pd
 
 def main():
-    seq1 = '09'
+    seq1 = '01'
     seq2 = '10'
     ca01_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq1))['arr_0'][15:]
     ca02_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq2))['arr_0'][15:]
@@ -312,7 +312,7 @@ def main():
     oms = online_meanshift3(feature_size = ca01_feats_orig.shape[1],
                             max_nbr_samples = startup,
                             batch_size = 10,
-                            sigmasq = 1.5e-5)
+                            sigmasq = 9.5e-6)
 
     all_normality_scores = numpy.zeros((ca01_feats_orig.shape[0]))
     all_mode_assignments = numpy.zeros((ca01_feats_orig.shape[0]))
@@ -387,7 +387,7 @@ def main():
     blend_fh.close()
 
     os.chdir(blend_dir)
-    ffmpeg_cmd = 'ffmpeg  -i %05blended.png -c:v libx264 -r 30 blended.avi'
+    ffmpeg_cmd = 'ffmpeg  -i %05d_blended.png -c:v libx264 -r 30 blended.avi'
     os.system(ffmpeg_cmd)
     print "Done!"
 
