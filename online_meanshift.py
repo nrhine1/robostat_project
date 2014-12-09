@@ -34,6 +34,7 @@ def gaussian_kernel_func(x0, x1, sigma=0.005):
         axis = 0
     return 1 / (sigma * numpy.sqrt(2 * numpy.pi )) * numpy.exp(-.5 * numpy.power(numpy.linalg.norm(x0 - x1, axis = axis)/ sigma, 2))
 
+# larger sigmasq means more lenient merging and larger kernel
 class online_meanshift3:
     def __init__(self, feature_size, max_nbr_samples = 200, batch_size=100, sigmasq = 0.05):
         self.samples = np.zeros((max_nbr_samples, feature_size), dtype=np.float64)
@@ -99,8 +100,8 @@ class online_meanshift3:
 
                 for mode_i, mode in enumerate(self.modes):
                     d = np.linalg.norm(mode - seed)**2
-                    print d
-                    print '{} < {}'.format(d, .25 * self.sigmasquare)
+                    # print d
+                    # print '{} < {}'.format(d, .25 * self.sigmasquare)
                     if d < .25 *  self.sigmasquare:
                         #duplicate node
                         has_found = True
@@ -131,8 +132,15 @@ class online_meanshift3:
                 #                                                              numpy.finfo(numpy.float64).
                 mode_assignments[s_idx] = mode_assignment
 
-            for s_idx in range(seeds.shape[0]):
-                normality_scores[s_idx] = 1 - self.mode_weights[mode_assignments[s_idx]] / (numpy.sum(self.mode_weights))
+
+                normality_scores[s_idx] = 1 - \
+                                          self.mode_weights[mode_assignment] / \
+                                          (numpy.sum(self.mode_weights) + numpy.finfo(numpy.float64).eps)
+
+            # for s_idx in range(seeds.shape[0]):
+
+            #     normality_scores[s_idx] = 1 - self.mode_weights[mode_assignments[s_idx]] / (numpy.sum(self.mode_weights) + numpy.finfo(numpy.float64).eps)
+            #     print normality_scores[s_idx]
 
             # update saved samples
             for spl in self.sample_buffer:
@@ -293,16 +301,20 @@ def main():
     # oms.MeanShift(ca01_feats[:100,:])
     # oms.Test()
     # oms.Evaluate()
-
+    
+    startup = 100
+    class_thresh = startup * 2
+    alarm_thresh = .5
     oms = online_meanshift3(feature_size = ca01_feats_orig.shape[1],
-                            max_nbr_samples = 100,
+                            max_nbr_samples = startup,
                             batch_size = 10,
-                            sigmasq = 1e-5)
+                            sigmasq = 1.5e-5)
 
     all_normality_scores = numpy.zeros((ca01_feats_orig.shape[0]))
     all_mode_assignments = numpy.zeros((ca01_feats_orig.shape[0]))
 
     batch_idx = 0
+    x_vals = range(ca01_feats_orig.shape[0])
     for i in range(ca01_feats_orig.shape[0]):
         normality_scores, mode_assignments = oms.fit(ca01_feats_orig[i, :])
 
@@ -318,17 +330,29 @@ def main():
             print "on sample {}".format(sample_idx)
                 
             plt.cla()
-            plt.plot(range(ca01_feats_orig.shape[0]), all_normality_scores)
-            plt.scatter(range(ca01_feats_orig.shape[0]), 
-                        all_mode_assignments / 100.0 + 1/100.,
-                        linewidths = 1.0)
+            ax = plt.plot(x_vals, all_normality_scores)
+            if i > class_thresh:
+                plt.fill_between(x_vals, all_normality_scores, 
+                                 where=numpy.logical_and(all_normality_scores >= alarm_thresh,
+                                                         numpy.asarray(x_vals) > class_thresh),
+                                color='red')
+
+
+            # plots cluster assignments
+            # plt.scatter(x_vals,
+            #             all_mode_assignments / 100.0 + 1/100.,
+            #             linewidths = 1.0)
+
 
             plt.axis([0, ca01_feats_orig.shape[0], 0, 1])
             plt.draw()
             plt.show(block = False)
+            plt.xlabel('Frame Index')
+            plt.ylabel('Anomaly Score')
 
             
     print "Done!"
+    pdb.set_trace()
 
 
 if __name__ == '__main__':
