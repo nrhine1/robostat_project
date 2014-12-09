@@ -20,3 +20,4 @@ def blend_plot_and_frame(p, f, frame_weight = .5):
     return blend
 
     
+cmd = "ffmpeg -i blended.avi -i ../data/cmu_harlem_shake.mp3 -map 0 -map 1 -codec copy -shortest blended_with_sound.avi"

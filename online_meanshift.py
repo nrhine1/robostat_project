@@ -106,7 +106,7 @@ class online_meanshift3:
                     d = np.linalg.norm(mode - seed)**2
                     # print d
                     # print '{} < {}'.format(d, .25 * self.sigmasquare)
-                    if d < .25 *  self.sigmasquare:
+                    if d < .5 *  self.sigmasquare:
                         #duplicate node
                         has_found = True
                         mode_assignment = mode_i
@@ -277,12 +277,14 @@ def compute_pairwise_dists(X1, X2):
     return pd
 
 def main():
-    seq1 = '01'
+    seq1 = '99'
     seq2 = '10'
-    ca01_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq1))['arr_0'][15:]
+    key = 'feats'
+
+    ca01_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq1))[key][15:]
     ca02_feats_orig = numpy.load('feats/ca{}_no_label_bov.npz'.format(seq2))['arr_0'][15:]
 
-    ca01_labels = numpy.load('data/ca{}_no_label_bov_labels.npz'.format(seq1))['arr_0'][15:]
+    # ca01_labels = numpy.load('data/ca{}_no_label_bov_labels.npz'.format(seq1))['arr_0'][15:]
     ca02_labels = numpy.load('data/ca{}_no_label_bov_labels.npz'.format(seq2))['arr_0'][15:]
 
     train_test_idx = 480
@@ -291,12 +293,12 @@ def main():
 
     le_weird = ca01_feats_orig[train_test_idx:, :]
     le_normal = ca01_feats_orig[:train_test_idx, :]
-    le_normal_labels = ca01_labels[:train_test_idx, :]
-    le_weird_labels = ca01_labels[train_test_idx:, :]
+    # le_normal_labels = ca01_labels[:train_test_idx, :]
+    # le_weird_labels = ca01_labels[train_test_idx:, :]
 
     for x in range(n_duplicates):
         ca01_feats_orig = numpy.vstack((ca01_feats_orig, le_normal))
-        ca01_labels = numpy.vstack((ca01_labels, le_normal_labels))
+        # ca01_labels = numpy.vstack((ca01_labels, le_normal_labels))
    
     shuffle_inds = numpy.asarray(range(ca01_feats_orig.shape[0]))
     ca01_feats = ca01_feats_orig[shuffle_inds, :]
@@ -312,7 +314,8 @@ def main():
     oms = online_meanshift3(feature_size = ca01_feats_orig.shape[1],
                             max_nbr_samples = startup,
                             batch_size = 10,
-                            sigmasq = 9.5e-6)
+                            sigmasq = 100)
+                            # sigmasq = 9.5e-6)
 
     all_normality_scores = numpy.zeros((ca01_feats_orig.shape[0]))
     all_mode_assignments = numpy.zeros((ca01_feats_orig.shape[0]))
