@@ -8,6 +8,9 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 import numpy
 import numpy as np
+import util
+import Image
+import os
 
 import sklearn.metrics
 from sklearn.neighbors import BallTree
@@ -16,7 +19,8 @@ from sklearn.metrics.pairwise import euclidean_distances
 
 import pdb
 import gtkutils.pdbwrap as pdbw
-#import gtkutils.img_util as iu
+import gtkutils.vis_util as vu
+import gtkutils.img_util as iu
 
  
 def gaussian_kernel_update(x, points, bandwidth):
@@ -315,8 +319,23 @@ def main():
 
     batch_idx = 0
     x_vals = range(ca01_feats_orig.shape[0])
+
+    fig = plt.figure()
+    blend_dir = 'ca{}_anomaly_video'.format(seq1)
+
+    blend_fn = '{}/image_list.txt'.format(blend_dir)
+
+    if not os.path.isdir(blend_dir):
+        os.mkdir(blend_dir)
+
+    blend_fh = open(blend_fn, 'w')
+    
+
     for i in range(ca01_feats_orig.shape[0]):
         normality_scores, mode_assignments = oms.fit(ca01_feats_orig[i, :])
+
+        frame_fn = 'data/ca{}_frames/ca{}_{:05d}.png'.format(seq1, seq1, i + 15)
+        frame = iu.o(frame_fn)
 
         if normality_scores is not None:
             all_normality_scores[batch_idx * oms.batch_size : 
@@ -351,9 +370,27 @@ def main():
 
             plt.draw()
             plt.show(block = False)
+            os.fsync(blend_fh)
 
-            
+        plt.draw()
+        plt.show(block = False)
+        ii = vu.fig2img(fig)
+
+        ii.save('tmp/image_{}.png'.format(i))
+
+        blended = util.blend_plot_and_frame(ii, frame, frame_weight = .7)
+
+        save_bn = '{:05d}_blended.png'.format(i)
+        Image.fromarray(blended).save('{}/{}'.format(blend_dir, save_bn))
+        blend_fh.write("file '{}'\n".format(save_bn))
+
+    blend_fh.close()
+
+    os.chdir(blend_dir)
+    ffmpeg_cmd = 'ffmpeg  -i %05blended.png -c:v libx264 -r 30 blended.avi'
+    os.system(ffmpeg_cmd)
     print "Done!"
+
     pdb.set_trace()
 
 
