@@ -1,6 +1,7 @@
 import numpy as np
 import pdb
 import numpy.random as rnd
+import numpy
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -29,7 +30,7 @@ from online_meanshift import online_meanshift3
 #    ax.view_init(azim=0)
 #    plt.savefig(fout)
 
-def Display3DPts(ax, locs,clr='b'):
+def Display3DPts(ax, locs,clr='b', size = 6):
     xs = locs[:,0]
     ys = locs[:,1]
     zs = locs[:,2]
@@ -39,7 +40,7 @@ def Display3DPts(ax, locs,clr='b'):
 
 
 mu1 = np.array([1, 0, 0])
-Sigma1 = np.eye(mu1.shape[0],mu1.shape[0]) * 0.01
+Sigma1 = np.eye(mu1.shape[0],mu1.shape[0]) * 0.05
 N1 = 100
 mu2 = np.array([0, 1, 0])
 Sigma2 = np.eye(mu1.shape[0],mu1.shape[0]) * 0.01
@@ -66,7 +67,7 @@ toy_feats = np.vstack((class1[:(N1/2),:],
                        class2[(N2/2):,:], 
                        class3[1:,:]))
 
-print toy_lbls.shape, toy_feats.shape
+
 assert(toy_lbls.shape[0] == toy_feats.shape[0])
 
 oms = online_meanshift3(3, 25, 10)
@@ -79,9 +80,13 @@ ax = plt.subplot(111, projection='3d')
 hmodes = None
 clrs = np.array(('g','b','r','k','brown','y'))
 N = toy_feats.shape[0]
+old_modes = None
 for i in range(N):
     print "fitting iteration {}/{}".format(i,N)
     oms.fit(toy_feats[i])
+
+    if old_modes is None and len(oms.modes) >= 1:
+        old_modes = numpy.asarray(oms.modes).copy()
 
     ax, pc = Display3DPts(ax, toy_feats[np.newaxis,i,:], clrs[toy_lbls[i]])
     
@@ -89,10 +94,20 @@ for i in range(N):
     for mode in oms.modes:
         ax, pc = Display3DPts(ax, mode[np.newaxis, :], clrs[3])
 
-    plt.savefig('figs/{}.jpg'.format(i))
 
-    pc.remove()
+    # if modes moved, draw lines between old modes and new modes
+    if oms.shift_indicators.sum() > 0:
+        for (j, m_i) in enumerate(oms.shift_indicators[:len(old_modes)]):
+            if m_i:
+                data = numpy.vstack((old_modes[j].flatten(), oms.modes[j].flatten()))
+                ax.plot3D(data[:,0], data[:, 1],  data[:, 2], 'r-', linewidth = 3)
+
+        old_modes = numpy.asarray(oms.modes).copy()
+
+    plt.savefig('figs/{}.jpg'.format(i))
     plt.draw()
+    # plt.show(block = True)
+    # pc.remove()
 
 plt.show()
 
